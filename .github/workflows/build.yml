@@ -9,9 +9,10 @@ on:
 
 env:
   KVER: android14-6.1
-  # 用超长 LOCALVERSION 把 ko 的占位 vermagic 拉长,
-  # 给设备侧的原地回写 (device_vermagic + NUL 填充) 留足空间
-  LOCALVERSION: -opensesame-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  # 用较长的 LOCALVERSION 把 ko 的占位 vermagic 拉长, 给设备侧的原地回写
+  # (device_vermagic + NUL 填充) 留足空间。注意内核限制 release 字符串 <= 64 字节:
+  # "6.1.177"(7) + LOCALVERSION(40) + "-g<12位hash>"(14) = 61, 不能再长
+  LOCALVERSION: -opensesame-aaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 jobs:
   build:
