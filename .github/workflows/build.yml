@@ -36,6 +36,17 @@ jobs:
           cd "$RUNNER_TEMP/kernel"
           make LLVM=1 LLVM_IAS=1 ARCH=arm64 gki_defconfig \
             || make LLVM=1 LLVM_IAS=1 ARCH=arm64 defconfig
+          # GKI 配置引用的密钥文件只存在于 Google 私有构建仓库, 公共源码树里没有,
+          # 外部模块构建必须清空, 否则 prepare 阶段报 "No rule to make target 'certs/...'"
+          scripts/config --file .config \
+            --set-str SYSTEM_TRUSTED_KEYS "" \
+            --set-str SYSTEM_REVOCATION_KEYS "" \
+            --set-str SYSTEM_BLACKLIST_HASH_LIST ""
+          # BTF 需要 vmlinux (完整内核构建产物), 外部模块构建用不到, 关掉
+          scripts/config --file .config \
+            --set-val DEBUG_INFO_BTF n \
+            --set-val DEBUG_INFO_BTF_MODULES n
+          make LLVM=1 LLVM_IAS=1 ARCH=arm64 olddefconfig
           make LLVM=1 LLVM_IAS=1 ARCH=arm64 -j"$(nproc)" modules_prepare \
             LOCALVERSION=${{ env.LOCALVERSION }}
 
