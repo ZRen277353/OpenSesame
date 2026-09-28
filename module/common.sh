@@ -74,14 +74,14 @@ rewrite_ko_vermagic() {
 
 # 加载: 先直接试; vermagic 失败则 学习 -> 回写 -> 重试
 load_ko() {
-	$BB insmod "$KO" enable=1 2>/dev/null && return 0
+	$BB insmod "$KO" 2>/dev/null && return 0
 	local v
 	v=$(device_vermagic) || {
 		log "拿不到设备 vermagic (vendor 模块和 kmsg 里都没有)"
 		return 1
 	}
 	rewrite_ko_vermagic "$v" || return 1
-	$BB insmod "$KO" enable=1
+	$BB insmod "$KO"
 }
 
 loaded() {

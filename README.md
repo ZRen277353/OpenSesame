@@ -13,21 +13,24 @@
 
 ```
 insmod xxx.ko
-  └─ check_modinfo() ── same_magic()   ← patch 成 mov w0,#1 ; ret (恒真)
+  └─ check_modinfo() ── same_magic()   ← kretprobe 把返回值改写为恒真
                              │
                              └─ vermagic 不匹配 => 原本返回 -ENOEXEC ("Exec format error")
 ```
 
-- `same_magic()` 是静态函数, 通过 kprobe 按符号名在 `/proc/kallsyms` 中定位;
-- `aarch64_insn_patch_text()` 未导出, 同样通过 kprobe 取地址后按原型调用
-  (内核开启 CFI 时按类型哈希校验, 原型一致即可通过);
-- patch 前**校验原始指令** (全零/已 patch 等异常直接放弃), `rmmod` 时还原;
-- 默认 dry-run (`enable=0`), 只探测不改内核。
+- 在 `same_magic()` 上挂 **kretprobe**: 函数本体照常执行, 返回时把 `x0`
+  改写为 1。arm64 的 `__kretprobe_trampoline` 会从 handler 看到的同一份
+  pt_regs 恢复寄存器, 因此调用方读到的返回值恒为 true;
+- **只使用已导出的 `register_kretprobe` API, 不修改任何内核内存** ——
+  注册失败就是干净失败, `rmmod` 即完全还原 (v0.1 曾直接改写内核文本,
+  在 CFI/补丁路径上引发内核崩溃, 已废弃);
+- 符号 CRC (CONFIG_MODVERSIONS) 校验不受影响 —— ABI 不兼容的模块依然会被
+  内核正常拒绝, 这是本项目的安全边界。
 
-模块加载器自带 vermagic 适配 (ksuinit 同款思路): CI 构建时用超长
-`LOCALVERSION` 把 `.ko` 的占位 vermagic 拉长, 设备侧优先从厂商模块读取真实
-vermagic, 兜底从一次失败 insmod 的 kmsg 里解析 `should be '...'`, 然后**原地
-回写**到 `.ko` 再加载。
+模块加载器自带 vermagic 适配 (ksuinit 同款思路): CI 构建时用加长
+`LOCALVERSION` 把 `.ko` 的占位 vermagic 拉长并随包附带字节偏移文件
+(`opensesame.offset`), 设备侧优先从厂商模块读取真实 vermagic, 兜底从一次
+失败 insmod 的 kmsg 里解析 `should be '...'`, 然后**原地回写**到 `.ko` 再加载。
 
 ## 当前支持范围 (v0.1)
 
@@ -61,7 +64,8 @@ adb shell "su -c 'sh /data/local/tmp/probe.sh'"
 1. 默认不自动加载, 必须先手动验证 (action 按钮);
 2. 自动加载发生在开机末尾 (service.sh + 20s 延迟), panic 代价最小;
 3. 熔断: 连续 2 次"加载后 60 秒内系统未稳定"就拒绝自动加载;
-4. `.ko` 内部防呆: patch 前比对原始指令, 不盲写; `rmmod` 可还原。
+4. `.ko` 不写任何内核内存: 唯一的内核交互是只读的 kretprobe 钩子,
+   注册失败即干净退出, `rmmod` 即还原。
 
 ## 目录结构
 

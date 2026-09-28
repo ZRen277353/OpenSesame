@@ -7,13 +7,13 @@ echo "== 内核 =="
 uname -a
 echo
 echo "== 关键符号 (/proc/kallsyms) =="
-for s in same_magic check_modinfo layout_and_allocate aarch64_insn_patch_text aarch64_insn_write; do
-		if grep -qE " $s\$" /proc/kallsyms 2>/dev/null; then
-			echo "  [存在] $s"
-		else
-			echo "  [缺失] $s   <-- same_magic 缺失 = 本内核不受支持 (被内联)"
-		fi
-	done
+for s in same_magic check_modinfo; do
+	if grep -qE " $s\$" /proc/kallsyms 2>/dev/null; then
+		echo "  [存在] $s"
+	else
+		echo "  [缺失] $s   <-- same_magic 缺失 = 本内核不受支持 (被内联)"
+	fi
+done
 echo
 echo "== 设备 vermagic 期望值 (从厂商模块读取) =="
 for f in /vendor_dlkm/lib/modules/*.ko /vendor/lib/modules/*.ko /odm/lib/modules/*.ko; do
