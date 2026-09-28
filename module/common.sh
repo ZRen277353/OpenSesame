@@ -1,0 +1,81 @@
+#!/bin/sh
+# OpenSesame 公共函数: vermagic 学习/回写 + 内核模块加载
+# 由 action.sh / service.sh source, 不单独执行。
+
+MODDIR="${MODDIR:-${0%/*}}"
+KO="$MODDIR/opensesame.ko"
+MODNAME=opensesame
+
+# KSU/SukiSU/Magisk 自带的 busybox (grep -a/-o/dd 行为比 toybox 稳)
+BB=""
+for b in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox busybox; do
+	if [ -x "$b" ] || command -v "$b" >/dev/null 2>&1; then
+		BB="$b"
+		break
+	fi
+done
+
+log() { echo "[opensesame] $*"; }
+
+# 设备真实 vermagic 优先从厂商自带模块读取 (不产生失败日志)
+vermagic_from_vendor() {
+	local f v
+	for f in /vendor_dlkm/lib/modules/*.ko /vendor/lib/modules/*.ko /odm/lib/modules/*.ko; do
+		[ -f "$f" ] || continue
+		v=$($BB grep -aoh 'vermagic=[ -~]*' "$f" 2>/dev/null | head -n 1 | cut -c10-)
+		if [ -n "$v" ]; then
+			echo "$v"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# 兜底: 试载失败后, 从内核日志解析 "version magic '..' should be '..'" (ksuinit 同款思路)
+vermagic_from_kmsg() {
+	dmesg 2>/dev/null | sed -n "s/.*version magic '[^']*' should be '\([^']*\)'.*/\1/p" | tail -n 1
+}
+
+device_vermagic() {
+	local v
+	v=$(vermagic_from_vendor) && [ -n "$v" ] && { echo "$v"; return 0; }
+	v=$(vermagic_from_kmsg) && [ -n "$v" ] && { echo "$v"; return 0; }
+	return 1
+}
+
+# 把设备 vermagic 原位写进 ko 的 .modinfo
+# CI 构建时已用超长 LOCALVERSION 把占位 vermagic 拉长, 只要设备串不超过占位串即可原地改写
+rewrite_ko_vermagic() {
+	local v="$1" off oldval
+	[ -f "$KO" ] || return 1
+	off=$($BB grep -abo 'vermagic=' "$KO" | head -n 1 | cut -d: -f1)
+	if [ -z "$off" ]; then
+		log "ko 里没有 vermagic 记录"
+		return 1
+	fi
+	oldval=$($BB grep -aoh 'vermagic=[ -~]*' "$KO" | head -n 1 | cut -c10-)
+	if [ ${#v} -gt ${#oldval} ]; then
+		log "设备 vermagic(${#v} 字节) 比占位(${#oldval} 字节)还长, 无法回写"
+		return 1
+	fi
+	# 写入: 设备串 + NUL 填满原串长度 (含原结尾的 NUL)
+	{ printf '%s' "$v"; $BB dd if=/dev/zero bs=1 count=$(( ${#oldval} - ${#v} + 1 )) 2>/dev/null; } |
+		$BB dd of="$KO" bs=1 seek=$(( off + 9 )) conv=notrunc 2>/dev/null
+	log "vermagic 已回写: $v"
+}
+
+# 加载: 先直接试; vermagic 失败则 学习 -> 回写 -> 重试
+load_ko() {
+	$BB insmod "$KO" enable=1 2>/dev/null && return 0
+	local v
+	v=$(device_vermagic) || {
+		log "拿不到设备 vermagic (vendor 模块和 kmsg 里都没有)"
+		return 1
+	}
+	rewrite_ko_vermagic "$v" || return 1
+	$BB insmod "$KO" enable=1
+}
+
+loaded() {
+	grep -q "$MODNAME" /proc/modules 2>/dev/null
+}

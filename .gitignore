@@ -1,0 +1,11 @@
+# 构建产物 (本项目只在 GitHub Actions 云端编译)
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+modules.order
+Module.symvers
+.tmp_versions/
+pkg/
+*.zip

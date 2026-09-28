@@ -1,0 +1,58 @@
+name: Build OpenSesame
+
+# 本项目禁止本地编译, 所有构建都在 GitHub 云端完成
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'kernel/**', 'module/**', 'scripts/**', '.github/workflows/**' ]
+  workflow_dispatch:
+
+env:
+  KVER: android14-6.1
+  # 用超长 LOCALVERSION 把 ko 的占位 vermagic 拉长,
+  # 给设备侧的原地回写 (device_vermagic + NUL 填充) 留足空间
+  LOCALVERSION: -opensesame-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装构建依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex \
+            libssl-dev libelf-dev clang llvm lld zip
+
+      - name: 拉取 GKI 内核源码 (${{ env.KVER }})
+        run: |
+          git clone --depth=1 --branch ${{ env.KVER }} \
+            https://android.googlesource.com/kernel/common "$RUNNER_TEMP/kernel"
+
+      - name: 准备内核 (modules_prepare)
+        run: |
+          cd "$RUNNER_TEMP/kernel"
+          make LLVM=1 LLVM_IAS=1 ARCH=arm64 gki_defconfig \
+            || make LLVM=1 LLVM_IAS=1 ARCH=arm64 defconfig
+          make LLVM=1 LLVM_IAS=1 ARCH=arm64 -j"$(nproc)" modules_prepare \
+            LOCALVERSION=${{ env.LOCALVERSION }}
+
+      - name: 编译内核模块
+        run: |
+          make -C "$RUNNER_TEMP/kernel" LLVM=1 LLVM_IAS=1 ARCH=arm64 \
+            M="$GITHUB_WORKSPACE/kernel" modules LOCALVERSION=${{ env.LOCALVERSION }}
+
+      - name: 打包 KSU 模块
+        run: |
+          mkdir -p pkg
+          cp module/* pkg/
+          cp kernel/opensesame.ko pkg/opensesame.ko
+          cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-${{ env.KVER }}.zip" .
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenSesame-${{ env.KVER }}
+          path: OpenSesame-*.zip
