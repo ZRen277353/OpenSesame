@@ -61,6 +61,17 @@ jobs:
           mkdir -p pkg
           cp module/* pkg/
           cp kernel/opensesame.ko pkg/opensesame.ko
+          # 计算占位 vermagic 值的偏移与长度写入 offset 文件,
+          # 设备端 (busybox grep 无 -a/-b) 就不需要在二进制里做查找了
+          python3 - <<'EOF'
+          data = open('kernel/opensesame.ko', 'rb').read()
+          i = data.find(b'vermagic=')
+          assert i >= 0, 'vermagic= not found in .modinfo'
+          j = data.index(b'\0', i)
+          print('vermagic value: offset=%d len=%d' % (i + 9, j - i - 9))
+          assert j - i - 9 >= 80, '占位 vermagic 太短, 请调大 LOCALVERSION'
+          open('pkg/opensesame.offset', 'w').write('%d %d\n' % (i + 9, j - i - 9))
+          EOF
           cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-${{ env.KVER }}.zip" .
 
       - name: 上传构建产物

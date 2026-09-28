@@ -22,7 +22,7 @@ vermagic_from_vendor() {
 	local f v
 	for f in /vendor_dlkm/lib/modules/*.ko /vendor/lib/modules/*.ko /odm/lib/modules/*.ko; do
 		[ -f "$f" ] || continue
-		v=$($BB grep -aoh 'vermagic=[ -~]*' "$f" 2>/dev/null | head -n 1 | cut -c10-)
+		v=$(sed -n "s/.*vermagic=\([ -~]\{1,\}\).*/\1/p" "$f" 2>/dev/null | head -n 1)
 		if [ -n "$v" ]; then
 			echo "$v"
 			return 0
@@ -44,23 +44,31 @@ device_vermagic() {
 }
 
 # 把设备 vermagic 原位写进 ko 的 .modinfo
-# CI 构建时已用超长 LOCALVERSION 把占位 vermagic 拉长, 只要设备串不超过占位串即可原地改写
+# 偏移/长度来自 CI 生成的 opensesame.offset (busybox grep 没有 -a/-b, 设备端不做二进制查找)
 rewrite_ko_vermagic() {
-	local v="$1" off oldval
+	local v="$1" off oldlen
 	[ -f "$KO" ] || return 1
-	off=$($BB grep -abo 'vermagic=' "$KO" | head -n 1 | cut -d: -f1)
-	if [ -z "$off" ]; then
-		log "ko 里没有 vermagic 记录"
-		return 1
+	if [ -f "$MODDIR/opensesame.offset" ]; then
+		off=$(cut -d' ' -f1 "$MODDIR/opensesame.offset")
+		oldlen=$(cut -d' ' -f2 "$MODDIR/opensesame.offset")
+	else
+		# 兜底: 系统 toybox grep 通常支持 -b/-a; 不行就让用户重装最新模块
+		off=$(grep -abo 'vermagic=' "$KO" 2>/dev/null | head -n 1 | cut -d: -f1)
+		if [ -z "$off" ]; then
+			log "定位不到 vermagic, 请重新安装最新版模块 (缺少 opensesame.offset)"
+			return 1
+		fi
+		off=$(( off + 9 ))
+		oldlen=$(grep -aoh 'vermagic=[ -~]*' "$KO" 2>/dev/null | head -n 1 | wc -c)
+		oldlen=$(( oldlen - 1 ))
 	fi
-	oldval=$($BB grep -aoh 'vermagic=[ -~]*' "$KO" | head -n 1 | cut -c10-)
-	if [ ${#v} -gt ${#oldval} ]; then
-		log "设备 vermagic(${#v} 字节) 比占位(${#oldval} 字节)还长, 无法回写"
+	if [ ${#v} -gt $oldlen ]; then
+		log "设备 vermagic(${#v} 字节) 比占位(${oldlen} 字节)还长, 无法回写"
 		return 1
 	fi
 	# 写入: 设备串 + NUL 填满原串长度 (含原结尾的 NUL)
-	{ printf '%s' "$v"; $BB dd if=/dev/zero bs=1 count=$(( ${#oldval} - ${#v} + 1 )) 2>/dev/null; } |
-		$BB dd of="$KO" bs=1 seek=$(( off + 9 )) conv=notrunc 2>/dev/null
+	{ printf '%s' "$v"; $BB dd if=/dev/zero bs=1 count=$(( oldlen - ${#v} + 1 )) 2>/dev/null; } |
+		$BB dd of="$KO" bs=1 seek=$off conv=notrunc 2>/dev/null
 	log "vermagic 已回写: $v"
 }
 
