@@ -60,8 +60,9 @@ adb shell "su -c 'sh /data/local/tmp/probe.sh'"
 
 1. **禁止本地编译**: push 到 `main` 后 GitHub Actions 自动矩阵构建
    (或手动 workflow_dispatch), 从产物下载:
-   - `OpenSesame-all-kmi` —— 全 KMI 一体包 (推荐);
-   - `OpenSesame-<kmi>` —— 单 KMI 包;
+   - `OpenSesame-all-kmi` —— 全 KMI 一体包 (推荐, 装哪个机型都行);
+   - `OpenSesame-<kmi>` —— 单 KMI 包, 须与设备 KMI 一致
+     (两种包布局 v0.2.1 起均支持自动选择);
 2. SakiSU / KernelSU 管理器安装;
 3. **安装后默认不自动加载、不改内核**。点模块的「操作」按钮:
    第一次点击 = 加载 + 启用开机自动加载; 再点一次 = 卸载 + 关闭;
@@ -86,7 +87,14 @@ su -c 'cat /sys/fs/pstore/console-ramoops-0 | tail -c 6000'   # 上次崩溃现�
 
 常见失败: `kretprobe 注册失败` = 内核把 same_magic 内联了 (不支持);
 `disagrees about version of symbol` = 驱动 ABI 与内核不兼容 (CRC 校验
-正确拦截, 属预期行为, 请勿绕过)。
+正确拦截, 属预期行为, 请勿绕过);
+`模块目录里找不到 ko 文件` = 装了 v0.2.0 及更早的**单 KMI 包**
+(旧版加载脚本只认一体包的 kos/ 布局) —— 更新模块到 v0.2.1+,
+或改装 `OpenSesame-all-kmi` 一体包。
+
+关于系统 OTA 小版本更新 (如 6.1.124 → 6.1.145): **同一 KMI 内 ko 通用**,
+GKI 承诺同 KMI 分支内核 ABI 稳定, 无需重新构建; 若 OTA 跨了 KMI
+(如 6.1 → 6.6), 加载脚本会自动切换到对应的 ko。
 
 ## 目录结构
 

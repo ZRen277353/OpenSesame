@@ -42,9 +42,17 @@ select_ko() {
 		*6.6*)                             KMI=android15-6.6 ;;
 		*) return 1 ;;
 	esac
-	KO="$MODDIR/kos/opensesame-$KMI.ko"
-	KOOFF="$MODDIR/kos/opensesame-$KMI.offset"
-	[ -f "$KO" ] || return 1
+	# 一体包布局: kos/opensesame-<KMI>.ko; 单 KMI 包布局: 根目录 opensesame.ko
+	if [ -f "$MODDIR/kos/opensesame-$KMI.ko" ]; then
+		KO="$MODDIR/kos/opensesame-$KMI.ko"
+		KOOFF="$MODDIR/kos/opensesame-$KMI.offset"
+	elif [ -f "$MODDIR/opensesame.ko" ]; then
+		KO="$MODDIR/opensesame.ko"
+		KOOFF="$MODDIR/opensesame.offset"
+	else
+		log "KMI 识别为 $KMI, 但模块目录里找不到 ko 文件, 请重新安装最新版模块包"
+		return 1
+	fi
 	log "设备 KMI: $KMI (uname: $kv)"
 	return 0
 }
@@ -95,10 +103,11 @@ rewrite_ko_vermagic() {
 		oldlen=$(( oldlen - 1 ))
 	fi
 	if [ ${#v} -gt $oldlen ]; then
-		# 占位放不下完整设备 vermagic 时, 缩短版本号前缀:
+		# 占位放不下完整设备 vermagic 时, 缩短版本号前缀 (去掉 -androidxx 等后缀):
 		# 两侧都有 modversions 时, 内核比对忽略第一个空格之前的版本号段
 		t=${v#* }
-		v="6.1.124 $t"
+		rel=${v%% *}
+		v="${rel%%-*} $t"
 		log "占位不足, 使用缩短版本号形式 (${#v} 字节)"
 		if [ ${#v} -gt $oldlen ]; then
 			log "仍放不下, 无法回写"
@@ -113,10 +122,11 @@ rewrite_ko_vermagic() {
 
 # 加载: 选 ko -> 先直接试; vermagic 失败则 学习 -> 回写 -> 重试
 load_ko() {
-	select_ko || {
-		log "没有适配本机内核 ($(uname -r)) 的 ko"
+	if ! select_ko; then
+		# ko 文件缺失时 select_ko 已给出具体原因, 这里只报 KMI 不识别的情况
+		[ -n "$KMI" ] || log "没有适配本机内核 ($(uname -r)) 的 KMI, 请到仓库用 CI 构建对应 KMI 的模块包"
 		return 1
-	}
+	fi
 	$BB insmod "$KO" 2>/dev/null && return 0
 	local v
 	v=$(device_vermagic) || {
