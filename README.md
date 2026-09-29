@@ -2,6 +2,12 @@
 
 > 芝麻开门 —— 让内核全局放行 vermagic 校验, 所有内核驱动都能直接 insmod
 
+<div align="center">
+  <img src="https://count.getloli.com/get/@ZRen277353/OpenSesame?theme=moebooru" alt="访问计数" />
+  <br/>
+  <sub>猫娘计数板 · 本页面被打开的次数</sub>
+</div>
+
 一个 SakiSU / KernelSU 模块: 加载后在内核的 `same_magic()` (vermagic 比对
 函数) 上挂 kretprobe, 返回值恒改为 true —— 此后 **任何 vermagic 不匹配的
 内核驱动都能直接加载**, driver_auto 等自动安装脚本原样可用。符号 CRC
