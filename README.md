@@ -1,46 +1,49 @@
 # OpenSesame
 
-> 芝麻开门 —— 让内核放行 vermagic 校验不通过的内核模块
+> 芝麻开门 —— 让内核全局放行 vermagic 校验, 所有内核驱动都能直接 insmod
 
-一个 SakiSU / KernelSU 模块, 内含一个内核补丁模块 (`.ko`): 加载后把内核里负责
-比对 vermagic 的 `same_magic()` 改写为恒返回 true, 此后 `insmod` 一个 vermagic
-不匹配的 `.ko` 不再报 `Exec format error`。
+一个 SakiSU / KernelSU 模块: 加载后在内核的 `same_magic()` (vermagic 比对
+函数) 上挂 kretprobe, 返回值恒改为 true —— 此后 **任何 vermagic 不匹配的
+内核驱动都能直接加载**, driver_auto 等自动安装脚本原样可用。符号 CRC
+(CONFIG_MODVERSIONS) 校验**有意保留**, ABI 不兼容的驱动仍会被干净地拒绝,
+这是本项目的安全边界。
 
-**只放行 vermagic, 不动符号 CRC (CONFIG_MODVERSIONS) 校验** —— ABI 不兼容的
-模块依然会被内核正常拒绝, 这是本项目的安全边界。
+## 实战状态
 
-## 原理
+| 设备 | 内核 | 状态 |
+|---|---|---|
+| vivo PD2339M / iQOO Neo9S Pro (MT6989) | 6.1.124-android14-11-maybe-dirty | 模块加载成功, 为 6.1.159 GKI 编译的闭源驱动成功加载 |
+| 其他 GKI 设备 | 见支持范围 | 理论可用, 欢迎实测反馈 issue |
+
+## 工作原理
 
 ```
 insmod xxx.ko
-  └─ check_modinfo() ── same_magic()   ← kretprobe 把返回值改写为恒真
-                             │
+  └─ check_modinfo() ── same_magic()   <- kretprobe 把返回值改写为恒真
+                             |
                              └─ vermagic 不匹配 => 原本返回 -ENOEXEC ("Exec format error")
 ```
 
-- 在 `same_magic()` 上挂 **kretprobe**: 函数本体照常执行, 返回时把 `x0`
-  改写为 1。arm64 的 `__kretprobe_trampoline` 会从 handler 看到的同一份
+- 在 `same_magic()` 上挂 kretprobe: 函数本体照常执行, 返回时把 `x0` 改写
+  为 1。arm64 的 `__kretprobe_trampoline` 会从 handler 看到的同一份
   pt_regs 恢复寄存器, 因此调用方读到的返回值恒为 true;
-- **只使用已导出的 `register_kretprobe` API, 不修改任何内核内存** ——
-  注册失败就是干净失败, `rmmod` 即完全还原 (v0.1 曾直接改写内核文本,
-  在 CFI/补丁路径上引发内核崩溃, 已废弃);
-- 符号 CRC (CONFIG_MODVERSIONS) 校验不受影响 —— ABI 不兼容的模块依然会被
-  内核正常拒绝, 这是本项目的安全边界。
+- **只使用已导出的 `register_kretprobe` API, 不修改任何内核内存**:
+  注册失败就是干净失败, `rmmod` 即完全还原;
+- ko 自身的 vermagic 由加载脚本运行时适配 (ksuinit 同款思路): CI 构建时
+  随包附带占位 vermagic 的字节偏移文件, 设备侧优先从厂商模块读取真实
+  vermagic, 兜底从一次失败 insmod 的 kmsg 里解析 `should be '...'`,
+  原地回写后再加载。
 
-模块加载器自带 vermagic 适配 (ksuinit 同款思路): CI 构建时用加长
-`LOCALVERSION` 把 `.ko` 的占位 vermagic 拉长并随包附带字节偏移文件
-(`opensesame.offset`), 设备侧优先从厂商模块读取真实 vermagic, 兜底从一次
-失败 insmod 的 kmsg 里解析 `should be '...'`, 然后**原地回写**到 `.ko` 再加载。
+## 支持范围与自动适配
 
-## 当前支持范围 (v0.1)
-
-| 项 | 要求 |
-|---|---|
-| 架构 | arm64 |
-| 内核 | GKI 6.1 (`android14-6.1` 分支构建; 其他分支改 workflow 的 `KVER`) |
-| 前提 | 内核启用 CONFIG_KPROBES + CONFIG_KALLSYMS, 且 **kallsyms 保留了 `same_magic` 符号** (若被编译器内联则不受支持) |
-
-不确定自己的设备行不行? 跑一下探测脚本:
+- 架构: arm64, GKI 内核;
+- CI 矩阵为每个 KMI 分支构建一个 ko: `android14-6.1` / `android13-5.15` /
+  `android14-5.15` / `android15-6.6` (ddk 还支持 android12-5.10、
+  android13-5.10、android16-6.12, 需要时在 workflow 矩阵里追加);
+- **一体包 (`OpenSesame-all-kmi`) 内含全部 ko, 加载时按 `uname -r`
+  自动选择对应 KMI** —— 与 SakiSU 管理器为不同内核挑选 LKM 是同一逻辑;
+- 前提: 内核启用 CONFIG_KPROBES, 且 kallsyms 保留了 `same_magic` 符号
+  (若被编译器内联则该内核不受支持)。不确定请跑探测脚本:
 
 ```bash
 adb push scripts/probe.sh /data/local/tmp/
@@ -49,77 +52,70 @@ adb shell "su -c 'sh /data/local/tmp/probe.sh'"
 
 ## 使用方法
 
-1. 本仓库**禁止本地编译**, 所有构建由 GitHub Actions 完成: push 到 `main` 后
-   自动构建, 或在 Actions 页面手动触发 (workflow_dispatch);
-2. 从 Actions 的构建产物里下载 `OpenSesame-android14-6.1.zip`;
-3. SakiSU / KernelSU 管理器安装该 zip;
-4. **安装后默认不自动加载、不改内核**。到管理器里点本模块的「操作」按钮:
-   第一次点击 = 手动加载 + 启用开机自动加载; 再点一次 = 卸载 + 关闭。
+1. **禁止本地编译**: push 到 `main` 后 GitHub Actions 自动矩阵构建
+   (或手动 workflow_dispatch), 从产物下载:
+   - `OpenSesame-all-kmi` —— 全 KMI 一体包 (推荐);
+   - `OpenSesame-<kmi>` —— 单 KMI 包;
+2. SakiSU / KernelSU 管理器安装;
+3. **安装后默认不自动加载、不改内核**。点模块的「操作」按钮:
+   第一次点击 = 加载 + 启用开机自动加载; 再点一次 = 卸载 + 关闭;
+4. 加载成功后, 直接跑你的驱动安装脚本即可。
 
 ## 防 bootloop 设计
 
-内核补丁全部在内存中 (RAM-only), 重启即归零, 最坏情况是循环重启而不是砖,
-`fastboot flash init_boot` 刷回备份镜像即可 100% 恢复。模块自带四道保险:
+内核交互全部为 RAM-only (kretprobe 钩子), 重启即归零, 最坏情况是循环
+重启而不是砖。四道保险:
 
 1. 默认不自动加载, 必须先手动验证 (action 按钮);
-2. 自动加载发生在开机末尾 (service.sh + 20s 延迟), panic 代价最小;
+2. 自动加载发生在开机末尾 (service.sh + 20s 延迟);
 3. 熔断: 连续 2 次"加载后 60 秒内系统未稳定"就拒绝自动加载;
-4. `.ko` 不写任何内核内存: 唯一的内核交互是只读的 kretprobe 钩子,
-   注册失败即干净退出, `rmmod` 即还原。
+4. 加载流程持并发锁, 杜绝双脚本竞争 (曾实测导致 mod_sysfs_setup 崩溃)。
 
-## v0.2 路线变更: boot 内核补丁 (本机实测路线)
-
-本设备 (PD2339M / iQOO Neo9S Pro, MT6989, 6.1.124-android14-11-maybe-dirty) 实测发现:
-**任何用公共 GKI 源码 + 不同工具链构建的 .ko, 在这台 vivo 内核上加载必崩**
-(`mod_sysfs_setup` 遍历到垃圾 usage 链接, 见 pstore)。根因是 ko 内嵌的
-`struct module` (来自 `.gnu.linkonce.this_module` 段) 的布局与 vivo 内核
-实际布局存在差异, 且无法在不拿到 vivo 内核源码的前提下消除。
-
-因此本设备的最终方案改为 **boot 内核补丁**: 用 `scripts/patch_boot.py`
-解出原厂 boot 里的内核, 把 `same_magic()` 入口两条指令 (`paciasp; stp x29,x30`)
-改写为 `mov w0,#1; ret`, 重新打包。效果 = **内核全局放行 vermagic 校验**,
-原厂 driver_auto 等脚本原样可用。脚本逐字节校验、支持回读验证, 改坏可用
-原厂 boot 镜像 fastboot 刷回。
+## 排查
 
 ```bash
-python scripts/patch_boot.py 原厂boot.img boot_patched.im
-fastboot flash boot_<当前槽位> boot_patched.im
+su -c 'dmesg | grep opensesame'        # 模块自身日志
+su -c 'cat /sys/fs/pstore/console-ramoops-0 | tail -c 6000'   # 上次崩溃现场
 ```
 
-注意: CRC (modversions) 校验仍保留; vivo OTA 会覆盖 boot 分区, 升级后需对新
-boot 重新打补丁。
+常见失败: `kretprobe 注册失败` = 内核把 same_magic 内联了 (不支持);
+`disagrees about version of symbol` = 驱动 ABI 与内核不兼容 (CRC 校验
+正确拦截, 属预期行为, 请勿绕过)。
 
 ## 目录结构
 
 ```
 open-sesame/
-├── kernel/                    # 内核补丁模块源码 (CI 云端编译)
+├── kernel/                    # 内核补丁模块源码 (ddk 云端矩阵构建)
 │   ├── opensesame.c
 │   └── Makefile
-├── module/                    # SakiSU/KernelSU 模块 (打包进 zip)
+├── module/                    # SakiSU/KernelSU 模块
 │   ├── module.prop
 │   ├── customize.sh           # 安装脚本
-│   ├── common.sh              # vermagic 学习/回写 + 加载逻辑
-│   ├── action.sh              # 管理器「操作」按钮: 手动加载/卸载开关
+│   ├── common.sh              # KMI 识别 / vermagic 学习回写 / 加载
+│   ├── action.sh              # 「操作」按钮: 手动加载/卸载开关
 │   ├── service.sh             # 开机自动加载 (默认关, 带熔断)
 │   └── uninstall.sh
 ├── scripts/
-│   └── probe.sh               # 设备侧支持性自测
+│   ├── probe.sh               # 设备侧支持性自测
+│   └── patch_boot.py          # (已废弃的) boot 镜像补丁器, 留档
 └── .github/workflows/build.yml
 ```
 
-## 已知风险
+## 已知限制
 
-- 若 `same_magic` 已被内联, kallsyms 无此符号, 模块会明确报错退出 —— 此时
-  请勿尝试其他手段强改内核;
-- 放行 vermagic 后, 加载来源不明的 `.ko` 风险自担 (CRC 校验仍在, 但 CRC 相同
-  不代表行为无害);
+- 各厂商对 GKI 的魔改程度不同, 结构体布局极端偏离 GKI 的内核上, ko 自身
+  可能无法加载 (实测 case: 见 git 历史 v0.1.x 的 pstore 分析);
+- `same_magic` 被内联的内核不受支持;
+- 放行 vermagic 后, 加载来源不明的 `.ko` 风险自担;
 - 仅用于自有设备的实验与研究, 请遵守当地法律法规。
 
 ## 致谢
 
-vermagic 学习/回写的思路来自 [SakiSU](https://github.com/XingChenRS/SakiSU)
-的 ksuinit (runtime vermagic auto-adaptation)。
+- vermagic 运行时适配思路来自
+  [SakiSU](https://github.com/XingChenRS/SakiSU) 的 ksuinit;
+- 构建环境来自 [5ec1cff/ddk](https://github.com/5ec1cff/ddk)
+  (SakiSU 官方 LKM 同款)。
 
 ## License
 

@@ -1,6 +1,6 @@
 id=opensesame
 name=OpenSesame
-version=v0.1.4
-versionCode=5
+version=v0.2.0
+versionCode=6
 author=ZRen277353
-description=芝麻开门: 放行 vermagic 校验不通过的内核模块 (arm64 / GKI 6.1)。只 patch vermagic 比对, 不动符号 CRC 校验。安装后默认不自动加载, 请通过「操作」按钮手动启用。
+description=芝麻开门: kretprobe 放行 vermagic 校验, 多 GKI KMI 自动适配 (5.10/5.15/6.1/6.6)。只 patch vermagic 比对, 不动符号 CRC 校验。安装后默认不自动加载, 请通过「操作」按钮手动启用。

@@ -1,21 +1,24 @@
 name: Build OpenSesame
 
 # 本项目禁止本地编译, 所有构建都在 GitHub 云端完成。
-# v0.1.4 起: 构建环境切换为 ddk (与 SakiSU LKM 完全相同的官方 GKI 构建环境)。
-# 之前用源码树 + Ubuntu clang 自行 modules_prepare 的 ko 在本设备上存在
-# struct module 布局错位, 加载必崩 (见 pstore 分析)。
+# 构建环境: ddk (与 SakiSU 官方 LKM 相同的 GKI 官方构建环境)。
+# 矩阵覆盖各 GKI KMI 分支, 每个分支产出一个 ko; 汇总任务打出全 KMI 一体包,
+# 模块在设备上按 uname -r 自动选择 (SakiSU 式自动适配)。
 on:
   push:
     branches: [ main ]
     paths: [ 'kernel/**', 'module/**', 'scripts/**', '.github/workflows/**' ]
   workflow_dispatch:
 
-env:
-  KMI: android14-6.1
-
 jobs:
   build:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        kmi: [android14-6.1, android13-5.15, android14-5.15, android15-6.6]
+        # ddk 还支持: android12-5.10, android13-5.10, android16-6.12 (后者
+        # 需要 ddk README 提到的 Makefile.build 补丁), 需要时自行追加
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -26,11 +29,11 @@ jobs:
             -o /usr/local/bin/ddk
           sudo chmod +x /usr/local/bin/ddk
 
-      - name: 编译内核模块 (android14-6.1)
+      - name: 编译内核模块 (${{ matrix.kmi }})
         run: |
           cd kernel
-          ddk pull ${{ env.KMI }}
-          ddk build --target ${{ env.KMI }}
+          ddk pull ${{ matrix.kmi }}
+          ddk build --target ${{ matrix.kmi }}
 
       - name: 裁剪 ko 调试段
         run: |
@@ -38,7 +41,7 @@ jobs:
           sudo apt-get install -y llvm
           llvm-objcopy --strip-debug kernel/opensesame.ko
 
-      - name: 打包 KSU 模块
+      - name: 打包单 KMI 模块
         run: |
           mkdir -p pkg
           cp module/* pkg/
@@ -53,10 +56,49 @@ jobs:
           print('vermagic value: offset=%d len=%d' % (i + 9, j - i - 9))
           open('pkg/opensesame.offset', 'w').write('%d %d\n' % (i + 9, j - i - 9))
           EOF
-          cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-${{ env.KMI }}.zip" .
+          cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-${{ matrix.kmi }}.zip" .
 
-      - name: 上传构建产物
+      - name: 上传单 KMI 产物
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSesame-${{ env.KMI }}
+          name: OpenSesame-${{ matrix.kmi }}
           path: OpenSesame-*.zip
+
+  package-all:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 下载全部 KMI 产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: OpenSesame-*
+
+      - name: 汇总多 KMI 一体包 (设备端按 uname -r 自动选择)
+        run: |
+          mkdir -p pkg/kos
+          cp module/* pkg/
+          python3 - <<'EOF'
+          import glob, zipfile, io, os
+          found = []
+          for z in sorted(glob.glob('artifacts/OpenSesame-*/*.zip')):
+              base = os.path.basename(z)[:-4]
+              kmi = base.replace('OpenSesame-', '')
+              outer = zipfile.ZipFile(z)
+              inner = zipfile.ZipFile(io.BytesIO(outer.read(base + '.zip')))
+              open(f'pkg/kos/opensesame-{kmi}.ko', 'wb').write(inner.read('opensesame.ko'))
+              open(f'pkg/kos/opensesame-{kmi}.offset', 'wb').write(inner.read('opensesame.offset'))
+              found.append(kmi)
+              print('收录:', kmi)
+          assert 'opensesame-android14-6.1' in ' '.join(found), '主目标缺失'
+          EOF
+          cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-all-kmi.zip" .
+
+      - name: 上传一体包
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenSesame-all-kmi
+          path: OpenSesame-all-kmi.zip

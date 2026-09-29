@@ -1,28 +1,28 @@
 {
-  "total_count": 7,
+  "total_count": 8,
   "workflow_runs": [
     {
-      "id": 36544336254,
+      "id": 36544724763,
       "name": "Build OpenSesame",
-      "node_id": "WFR_kwLOUxLlzc8AAAAIgjZRfg",
+      "node_id": "WFR_kwLOUxLlzc8AAAAIgjw_Gw",
       "head_branch": "main",
-      "head_sha": "d14ee352494d384338fd22a428823227a79b8798",
+      "head_sha": "a698e7ab79a18d769095289ff24f6f7db3039dd4",
       "path": ".github/workflows/build.yml",
-      "display_title": "feat!: v0.1.4 构建环境切换为 ddk (SakiSU LKM 同款官方 GKI 环境)",
-      "run_number": 7,
+      "display_title": "fix(ci): 去掉与源文件同名的 -objs 声明 (循环依赖导致跳过编译)",
+      "run_number": 8,
       "event": "push",
       "status": "completed",
-      "conclusion": "failure",
+      "conclusion": "success",
       "workflow_id": 369506360,
-      "check_suite_id": 98956626492,
-      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXCkZKPA",
-      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254",
-      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36544336254",
+      "check_suite_id": 98957685797,
+      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXClZ0JQ",
+      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763",
+      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36544724763",
       "pull_requests": [
 
       ],
-      "created_at": "2026-09-29T08:41:35Z",
-      "updated_at": "2026-09-29T08:43:09Z",
+      "created_at": "2026-09-29T08:45:13Z",
+      "updated_at": "2026-09-29T08:47:01Z",
       "actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -48,7 +48,7 @@
       "referenced_workflows": [
 
       ],
-      "run_started_at": "2026-09-29T08:41:35Z",
+      "run_started_at": "2026-09-29T08:45:13Z",
       "triggering_actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -70,19 +70,19 @@
         "user_view_type": "public",
         "site_admin": false
       },
-      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/jobs",
-      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/logs",
-      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98956626492",
-      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/artifacts",
-      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/cancel",
-      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/rerun",
+      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/jobs",
+      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/logs",
+      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98957685797",
+      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/artifacts",
+      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/cancel",
+      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/rerun",
       "previous_attempt_url": null,
       "workflow_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/workflows/369506360",
       "head_commit": {
-        "id": "d14ee352494d384338fd22a428823227a79b8798",
-        "tree_id": "5ab3c9a63abbbf637cf73148bb31a5285fb1aa75",
-        "message": "feat!: v0.1.4 构建环境切换为 ddk (SakiSU LKM 同款官方 GKI 环境)\n\npstore+反汇编定位根因: ko 内嵌 struct module (this_module 段) 的\ninit/exit 指针偏移 (0x3c8) 与 vivo 内核的 target_list 偏移重合,\n即构建产物与 vivo 内核的 struct module 布局不一致, 加载必崩。\n\n改为 ddk (5ec1cff/ddk docker) 构建: 与 SakiSU 官方 LKM 完全相同的\nGKI 环境 (官方工具链/配置/Module.symvers), 其 LKM 在本机加载正常。\n- kernel/Makefile 改为 ddk 模板形态\n- CI 移除源码树 modules_prepare 流程\n- vermagic 回写支持缩短版本号前缀 (modversions 下内核忽略该段)\nv0.1.4 / versionCode 5",
-        "timestamp": "2026-09-29T08:37:16Z",
+        "id": "a698e7ab79a18d769095289ff24f6f7db3039dd4",
+        "tree_id": "4a07cbd7236881ba8f6f897bec7512e0fc7d1999",
+        "message": "fix(ci): 去掉与源文件同名的 -objs 声明 (循环依赖导致跳过编译)",
+        "timestamp": "2026-09-29T08:45:02Z",
         "author": {
           "name": "ZRen277353",
           "email": "ZRen277353@users.noreply.github.com"

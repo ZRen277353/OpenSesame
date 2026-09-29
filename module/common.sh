@@ -1,12 +1,12 @@
 #!/bin/sh
-# OpenSesame 公共函数: vermagic 学习/回写 + 内核模块加载
+# OpenSesame 公共函数: KMI 识别 / vermagic 学习回写 / 内核模块加载
 # 由 action.sh / service.sh source, 不单独执行。
 
 MODDIR="${MODDIR:-${0%/*}}"
-KO="$MODDIR/opensesame.ko"
 MODNAME=opensesame
+KO=""; KOOFF=""; KMI=""
 
-# KSU/SukiSU/Magisk 自带的 busybox (grep -a/-o/dd 行为比 toybox 稳)
+# KSU/SukiSU/Magisk 自带的 busybox
 BB=""
 for b in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox busybox; do
 	if [ -x "$b" ] || command -v "$b" >/dev/null 2>&1; then
@@ -15,10 +15,6 @@ for b in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/bus
 	fi
 done
 
-log() { echo "[opensesame] $*"; }
-
-# 并发锁: action 与 service 同时跑时, 内核里两份 finit_module 竞争同一文件
-# 曾导致 mod_sysfs_setup 崩溃 (pstore 实锤), 任何加载前必须持锁
 LOCK_DIR="/data/local/tmp/.opensesame.lock"
 acquire_lock() {
 	if ! mkdir "$LOCK_DIR" 2>/dev/null; then
@@ -28,6 +24,30 @@ acquire_lock() {
 	return 0
 }
 release_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
+
+log() { echo "[opensesame] $*"; }
+
+# 按 uname -r 识别设备的 GKI KMI, 选择对应的 ko (SakiSU 式自动适配)
+select_ko() {
+	local kv
+	kv=$(uname -r)
+	case "$kv" in
+		*android16*6.12*|*6.12*android16*) KMI=android16-6.12 ;;
+		*android15*6.6*|*6.6*android15*)   KMI=android15-6.6 ;;
+		*android14*5.15*|*5.15*android14*) KMI=android14-5.15 ;;
+		*android13*5.15*|*5.15*android13*) KMI=android13-5.15 ;;
+		*android13*5.10*|*5.10*android13*) KMI=android13-5.10 ;;
+		*android12*5.10*|*5.10*android12*) KMI=android12-5.10 ;;
+		*6.1*)                             KMI=android14-6.1 ;;
+		*6.6*)                             KMI=android15-6.6 ;;
+		*) return 1 ;;
+	esac
+	KO="$MODDIR/kos/opensesame-$KMI.ko"
+	KOOFF="$MODDIR/kos/opensesame-$KMI.offset"
+	[ -f "$KO" ] || return 1
+	log "设备 KMI: $KMI (uname: $kv)"
+	return 0
+}
 
 # 设备真实 vermagic 优先从厂商自带模块读取 (不产生失败日志)
 vermagic_from_vendor() {
@@ -56,18 +76,18 @@ device_vermagic() {
 }
 
 # 把设备 vermagic 原位写进 ko 的 .modinfo
-# 偏移/长度来自 CI 生成的 opensesame.offset (busybox grep 没有 -a/-b, 设备端不做二进制查找)
+# 偏移/长度来自 CI 生成的 opensesame.offset (busybox grep 无 -a/-b, 设备端不做二进制查找)
 rewrite_ko_vermagic() {
 	local v="$1" off oldlen
 	[ -f "$KO" ] || return 1
-	if [ -f "$MODDIR/opensesame.offset" ]; then
-		off=$(cut -d' ' -f1 "$MODDIR/opensesame.offset")
-		oldlen=$(cut -d' ' -f2 "$MODDIR/opensesame.offset")
+	if [ -f "$KOOFF" ]; then
+		off=$(cut -d' ' -f1 "$KOOFF")
+		oldlen=$(cut -d' ' -f2 "$KOOFF")
 	else
 		# 兜底: 系统 toybox grep 通常支持 -b/-a; 不行就让用户重装最新模块
 		off=$(grep -abo 'vermagic=' "$KO" 2>/dev/null | head -n 1 | cut -d: -f1)
 		if [ -z "$off" ]; then
-			log "定位不到 vermagic, 请重新安装最新版模块 (缺少 opensesame.offset)"
+			log "定位不到 vermagic, 请重新安装最新版模块 (缺少 offset 文件)"
 			return 1
 		fi
 		off=$(( off + 9 ))
@@ -91,8 +111,12 @@ rewrite_ko_vermagic() {
 	log "vermagic 已回写: $v"
 }
 
-# 加载: 先直接试; vermagic 失败则 学习 -> 回写 -> 重试
+# 加载: 选 ko -> 先直接试; vermagic 失败则 学习 -> 回写 -> 重试
 load_ko() {
+	select_ko || {
+		log "没有适配本机内核 ($(uname -r)) 的 ko"
+		return 1
+	}
 	$BB insmod "$KO" 2>/dev/null && return 0
 	local v
 	v=$(device_vermagic) || {
