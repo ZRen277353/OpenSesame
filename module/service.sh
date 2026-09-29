@@ -12,6 +12,8 @@ loaded && exit 0
 	# 等系统基本就绪再动内核, panic 也发生在开机末尾, 代价最小
 	sleep 20
 
+	acquire_lock || exit 0
+
 	# 上一轮有 attempt 却没有 stable => 上次加载后未稳定
 	if [ -f "$MODDIR/attempt" ] && [ ! -f "$MODDIR/stable" ]; then
 		fails=$(( $(cat "$MODDIR/failcount" 2>/dev/null || echo 0) + 1 ))
@@ -22,6 +24,7 @@ loaded && exit 0
 	rm -f "$MODDIR/stable"
 
 	if [ "$fails" -ge 2 ]; then
+		release_lock
 		log "连续 $fails 次加载后未稳定, 本次跳过自动加载 (重装模块或点一次操作按钮可重置)"
 		exit 0
 	fi
@@ -29,9 +32,11 @@ loaded && exit 0
 	date +%s > "$MODDIR/attempt"
 
 	if load_ko; then
+		release_lock
 		log "自动加载成功"
 		( sleep 60 && touch "$MODDIR/stable" ) &
 	else
+		release_lock
 		log "自动加载失败, 详见内核日志"
 	fi
 ) &

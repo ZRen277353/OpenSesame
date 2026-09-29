@@ -17,6 +17,18 @@ done
 
 log() { echo "[opensesame] $*"; }
 
+# 并发锁: action 与 service 同时跑时, 内核里两份 finit_module 竞争同一文件
+# 曾导致 mod_sysfs_setup 崩溃 (pstore 实锤), 任何加载前必须持锁
+LOCK_DIR="/data/local/tmp/.opensesame.lock"
+acquire_lock() {
+	if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+		log "另一个加载流程正在执行, 本次跳过"
+		return 1
+	fi
+	return 0
+}
+release_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
+
 # 设备真实 vermagic 优先从厂商自带模块读取 (不产生失败日志)
 vermagic_from_vendor() {
 	local f v

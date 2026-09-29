@@ -56,6 +56,10 @@ jobs:
           make -C "$RUNNER_TEMP/kernel" LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             M="$GITHUB_WORKSPACE/kernel" modules LOCALVERSION=${{ env.LOCALVERSION }}
 
+      # 调试段携带 2500+ 条无意义重定位, 部分内核加载器处理时存在风险, 一律裁掉
+      - name: 裁剪 ko 调试段
+        run: llvm-objcopy --strip-debug kernel/opensesame.ko
+
       - name: 打包 KSU 模块
         run: |
           mkdir -p pkg

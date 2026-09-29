@@ -20,7 +20,9 @@ fi
 echo "== OpenSesame 手动加载 =="
 echo "(首次会自动学习本机 vermagic 并回写, 失败一次属正常)"
 echo
+acquire_lock || exit 0
 if load_ko; then
+	release_lock
 	# 重置熔断计数
 	echo 0 > "$MODDIR/failcount"
 	rm -f "$MODDIR/attempt" "$MODDIR/stable"
@@ -31,6 +33,7 @@ if load_ko; then
 	echo "---- 内核日志 ----"
 	dmesg | tail -n 5
 else
+	release_lock
 	echo
 	echo "加载失败, 未启用自动加载 —— 请把下面的日志发给项目仓库 issue"
 	echo "---- 内核日志 ----"
