@@ -3,7 +3,7 @@
 > 芝麻开门 —— 让内核全局放行 vermagic 校验, 所有内核驱动都能直接 insmod
 
 <div align="center">
-  <img src="https://count.getloli.com/get/@ZRen277353/OpenSesame?theme=moebooru" alt="访问计数" />
+  <img src="https://count.getloli.com/get/@ZRen277353-OpenSesame?theme=moebooru" alt="访问计数" />
   <br/>
   <sub>猫娘计数板 · 本页面被打开的次数</sub>
 </div>
