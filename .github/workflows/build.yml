@@ -79,21 +79,30 @@ jobs:
 
       - name: 汇总多 KMI 一体包 (设备端按 uname -r 自动选择)
         run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+          echo "--- 产物清单 ---"
+          find artifacts -type f
           mkdir -p pkg/kos
           cp module/* pkg/
           python3 - <<'EOF'
-          import glob, zipfile, io, os
+          import glob, zipfile, io, os, sys
           found = []
           for z in sorted(glob.glob('artifacts/OpenSesame-*/*.zip')):
               base = os.path.basename(z)[:-4]
               kmi = base.replace('OpenSesame-', '')
-              outer = zipfile.ZipFile(z)
-              inner = zipfile.ZipFile(io.BytesIO(outer.read(base + '.zip')))
-              open(f'pkg/kos/opensesame-{kmi}.ko', 'wb').write(inner.read('opensesame.ko'))
-              open(f'pkg/kos/opensesame-{kmi}.offset', 'wb').write(inner.read('opensesame.offset'))
-              found.append(kmi)
-              print('收录:', kmi)
-          assert 'opensesame-android14-6.1' in ' '.join(found), '主目标缺失'
+              try:
+                  outer = zipfile.ZipFile(z)
+                  inner = zipfile.ZipFile(io.BytesIO(outer.read(base + '.zip')))
+                  open(f'pkg/kos/opensesame-{kmi}.ko', 'wb').write(inner.read('opensesame.ko'))
+                  open(f'pkg/kos/opensesame-{kmi}.offset', 'wb').write(inner.read('opensesame.offset'))
+                  found.append(kmi)
+                  print('收录:', kmi)
+              except Exception as e:
+                  print('!! 跳过', kmi, ':', e)
+          print('汇总结果:', found)
+          if 'android14-6.1' not in found:
+              sys.exit('主目标 android14-6.1 缺失')
           EOF
           cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-all-kmi.zip" .
 

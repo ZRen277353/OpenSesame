@@ -1,28 +1,28 @@
 {
-  "total_count": 8,
+  "total_count": 9,
   "workflow_runs": [
     {
-      "id": 36544724763,
+      "id": 36547350794,
       "name": "Build OpenSesame",
-      "node_id": "WFR_kwLOUxLlzc8AAAAIgjw_Gw",
+      "node_id": "WFR_kwLOUxLlzc8AAAAIgmRRCg",
       "head_branch": "main",
-      "head_sha": "a698e7ab79a18d769095289ff24f6f7db3039dd4",
+      "head_sha": "6bc8c0186d86c3e344f00542b044b92387129e80",
       "path": ".github/workflows/build.yml",
-      "display_title": "fix(ci): 去掉与源文件同名的 -objs 声明 (循环依赖导致跳过编译)",
-      "run_number": 8,
+      "display_title": "feat!: v0.2.0 多 KMI 矩阵构建 + 设备端自动适配",
+      "run_number": 9,
       "event": "push",
       "status": "completed",
-      "conclusion": "success",
+      "conclusion": "failure",
       "workflow_id": 369506360,
-      "check_suite_id": 98957685797,
-      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXClZ0JQ",
-      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763",
-      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36544724763",
+      "check_suite_id": 98964933053,
+      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXCsUJvQ",
+      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794",
+      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36547350794",
       "pull_requests": [
 
       ],
-      "created_at": "2026-09-29T08:45:13Z",
-      "updated_at": "2026-09-29T08:47:01Z",
+      "created_at": "2026-09-29T09:09:39Z",
+      "updated_at": "2026-09-29T09:11:48Z",
       "actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -48,7 +48,7 @@
       "referenced_workflows": [
 
       ],
-      "run_started_at": "2026-09-29T08:45:13Z",
+      "run_started_at": "2026-09-29T09:09:39Z",
       "triggering_actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -70,19 +70,19 @@
         "user_view_type": "public",
         "site_admin": false
       },
-      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/jobs",
-      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/logs",
-      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98957685797",
-      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/artifacts",
-      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/cancel",
-      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544724763/rerun",
+      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/jobs",
+      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/logs",
+      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98964933053",
+      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/artifacts",
+      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/cancel",
+      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/rerun",
       "previous_attempt_url": null,
       "workflow_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/workflows/369506360",
       "head_commit": {
-        "id": "a698e7ab79a18d769095289ff24f6f7db3039dd4",
-        "tree_id": "4a07cbd7236881ba8f6f897bec7512e0fc7d1999",
-        "message": "fix(ci): 去掉与源文件同名的 -objs 声明 (循环依赖导致跳过编译)",
-        "timestamp": "2026-09-29T08:45:02Z",
+        "id": "6bc8c0186d86c3e344f00542b044b92387129e80",
+        "tree_id": "4adc51ea76d664a07bb38bad0ffc10c2e3409c52",
+        "message": "feat!: v0.2.0 多 KMI 矩阵构建 + 设备端自动适配\n\n- CI: ddk 矩阵构建 android14-6.1 / android13-5.15 / android14-5.15 /\n  android15-6.6 四个 KMI, 新增 package-all 汇总任务打出全 KMI 一体包\n- 模块加载时按 uname -r 自动选择对应 KMI 的 ko (SakiSU 式自动适配)\n- customize.sh/module.prop 同步支持范围说明\n- 本机 (vivo PD2339M, 6.1.124) 实测: 模块加载成功, 闭源 GKI 驱动加载成功\nv0.2.0 / versionCode 6",
+        "timestamp": "2026-09-29T09:06:09Z",
         "author": {
           "name": "ZRen277353",
           "email": "ZRen277353@users.noreply.github.com"
