@@ -1,6 +1,9 @@
 name: Build OpenSesame
 
-# 本项目禁止本地编译, 所有构建都在 GitHub 云端完成
+# 本项目禁止本地编译, 所有构建都在 GitHub 云端完成。
+# v0.1.4 起: 构建环境切换为 ddk (与 SakiSU LKM 完全相同的官方 GKI 构建环境)。
+# 之前用源码树 + Ubuntu clang 自行 modules_prepare 的 ko 在本设备上存在
+# struct module 布局错位, 加载必崩 (见 pstore 分析)。
 on:
   push:
     branches: [ main ]
@@ -8,11 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  KVER: android14-6.1
-  # 用较长的 LOCALVERSION 把 ko 的占位 vermagic 拉长, 给设备侧的原地回写
-  # (device_vermagic + NUL 填充) 留足空间。注意内核限制 release 字符串 <= 64 字节:
-  # "6.1.177"(7) + LOCALVERSION(40) + "-g<12位hash>"(14) = 61, 不能再长
-  LOCALVERSION: -opensesame-aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  KMI: android14-6.1
 
 jobs:
   build:
@@ -21,44 +20,23 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装构建依赖
+      - name: 安装 ddk (SakiSU LKM 同款构建环境)
+        run: |
+          sudo curl -fsSL https://raw.githubusercontent.com/5ec1cff/ddk/main/scripts/ddk \
+            -o /usr/local/bin/ddk
+          sudo chmod +x /usr/local/bin/ddk
+
+      - name: 编译内核模块 (android14-6.1)
+        run: |
+          cd kernel
+          ddk pull ${{ env.KMI }}
+          ddk build --target ${{ env.KMI }}
+
+      - name: 裁剪 ko 调试段
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex \
-            libssl-dev libelf-dev clang llvm lld zip
-
-      - name: 拉取 GKI 内核源码 (${{ env.KVER }})
-        run: |
-          git clone --depth=1 --branch ${{ env.KVER }} \
-            https://android.googlesource.com/kernel/common "$RUNNER_TEMP/kernel"
-
-      - name: 准备内核 (modules_prepare)
-        run: |
-          cd "$RUNNER_TEMP/kernel"
-          make LLVM=1 LLVM_IAS=1 ARCH=arm64 gki_defconfig \
-            || make LLVM=1 LLVM_IAS=1 ARCH=arm64 defconfig
-          # GKI 配置引用的密钥文件只存在于 Google 私有构建仓库, 公共源码树里没有,
-          # 外部模块构建必须清空, 否则 prepare 阶段报 "No rule to make target 'certs/...'"
-          scripts/config --file .config \
-            --set-str SYSTEM_TRUSTED_KEYS "" \
-            --set-str SYSTEM_REVOCATION_KEYS "" \
-            --set-str SYSTEM_BLACKLIST_HASH_LIST ""
-          # BTF 需要 vmlinux (完整内核构建产物), 外部模块构建用不到, 关掉
-          scripts/config --file .config \
-            --set-val DEBUG_INFO_BTF n \
-            --set-val DEBUG_INFO_BTF_MODULES n
-          make LLVM=1 LLVM_IAS=1 ARCH=arm64 olddefconfig
-          make LLVM=1 LLVM_IAS=1 ARCH=arm64 -j"$(nproc)" modules_prepare \
-            LOCALVERSION=${{ env.LOCALVERSION }}
-
-      - name: 编译内核模块
-        run: |
-          make -C "$RUNNER_TEMP/kernel" LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-            M="$GITHUB_WORKSPACE/kernel" modules LOCALVERSION=${{ env.LOCALVERSION }}
-
-      # 调试段携带 2500+ 条无意义重定位, 部分内核加载器处理时存在风险, 一律裁掉
-      - name: 裁剪 ko 调试段
-        run: llvm-objcopy --strip-debug kernel/opensesame.ko
+          sudo apt-get install -y llvm
+          llvm-objcopy --strip-debug kernel/opensesame.ko
 
       - name: 打包 KSU 模块
         run: |
@@ -73,13 +51,12 @@ jobs:
           assert i >= 0, 'vermagic= not found in .modinfo'
           j = data.index(b'\0', i)
           print('vermagic value: offset=%d len=%d' % (i + 9, j - i - 9))
-          assert j - i - 9 >= 80, '占位 vermagic 太短, 请调大 LOCALVERSION'
           open('pkg/opensesame.offset', 'w').write('%d %d\n' % (i + 9, j - i - 9))
           EOF
-          cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-${{ env.KVER }}.zip" .
+          cd pkg && zip -rq9 "$GITHUB_WORKSPACE/OpenSesame-${{ env.KMI }}.zip" .
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSesame-${{ env.KVER }}
+          name: OpenSesame-${{ env.KMI }}
           path: OpenSesame-*.zip

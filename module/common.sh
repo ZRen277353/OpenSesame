@@ -75,8 +75,15 @@ rewrite_ko_vermagic() {
 		oldlen=$(( oldlen - 1 ))
 	fi
 	if [ ${#v} -gt $oldlen ]; then
-		log "设备 vermagic(${#v} 字节) 比占位(${oldlen} 字节)还长, 无法回写"
-		return 1
+		# 占位放不下完整设备 vermagic 时, 缩短版本号前缀:
+		# 两侧都有 modversions 时, 内核比对忽略第一个空格之前的版本号段
+		t=${v#* }
+		v="6.1.124 $t"
+		log "占位不足, 使用缩短版本号形式 (${#v} 字节)"
+		if [ ${#v} -gt $oldlen ]; then
+			log "仍放不下, 无法回写"
+			return 1
+		fi
 	fi
 	# 写入: 设备串 + NUL 填满原串长度 (含原结尾的 NUL)
 	{ printf '%s' "$v"; $BB dd if=/dev/zero bs=1 count=$(( oldlen - ${#v} + 1 )) 2>/dev/null; } |
