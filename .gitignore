@@ -10,3 +10,7 @@ Module.symvers
 pkg/
 *.zip
 _device/
+ci_*.json
+ci_*.log
+ci_*.txt
+insn.c.txt
