@@ -1,28 +1,28 @@
 {
-  "total_count": 9,
+  "total_count": 10,
   "workflow_runs": [
     {
-      "id": 36547350794,
+      "id": 36550593646,
       "name": "Build OpenSesame",
-      "node_id": "WFR_kwLOUxLlzc8AAAAIgmRRCg",
+      "node_id": "WFR_kwLOUxLlzc8AAAAIgpXMbg",
       "head_branch": "main",
-      "head_sha": "6bc8c0186d86c3e344f00542b044b92387129e80",
+      "head_sha": "1c2fd5e29373fa746010e9b9d0d1c87e437d1662",
       "path": ".github/workflows/build.yml",
-      "display_title": "feat!: v0.2.0 多 KMI 矩阵构建 + 设备端自动适配",
-      "run_number": 9,
+      "display_title": "fix(ci): package-all 加诊断与容错, 不再依赖预装 zip",
+      "run_number": 10,
       "event": "push",
       "status": "completed",
       "conclusion": "failure",
       "workflow_id": 369506360,
-      "check_suite_id": 98964933053,
-      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXCsUJvQ",
-      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794",
-      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36547350794",
+      "check_suite_id": 98973874095,
+      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXC013rw",
+      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36550593646",
+      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36550593646",
       "pull_requests": [
 
       ],
-      "created_at": "2026-09-29T09:09:39Z",
-      "updated_at": "2026-09-29T09:11:48Z",
+      "created_at": "2026-09-29T09:39:41Z",
+      "updated_at": "2026-09-29T09:41:55Z",
       "actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -48,7 +48,7 @@
       "referenced_workflows": [
 
       ],
-      "run_started_at": "2026-09-29T09:09:39Z",
+      "run_started_at": "2026-09-29T09:39:41Z",
       "triggering_actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -70,19 +70,19 @@
         "user_view_type": "public",
         "site_admin": false
       },
-      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/jobs",
-      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/logs",
-      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98964933053",
-      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/artifacts",
-      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/cancel",
-      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36547350794/rerun",
+      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36550593646/jobs",
+      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36550593646/logs",
+      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98973874095",
+      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36550593646/artifacts",
+      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36550593646/cancel",
+      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36550593646/rerun",
       "previous_attempt_url": null,
       "workflow_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/workflows/369506360",
       "head_commit": {
-        "id": "6bc8c0186d86c3e344f00542b044b92387129e80",
-        "tree_id": "4adc51ea76d664a07bb38bad0ffc10c2e3409c52",
-        "message": "feat!: v0.2.0 多 KMI 矩阵构建 + 设备端自动适配\n\n- CI: ddk 矩阵构建 android14-6.1 / android13-5.15 / android14-5.15 /\n  android15-6.6 四个 KMI, 新增 package-all 汇总任务打出全 KMI 一体包\n- 模块加载时按 uname -r 自动选择对应 KMI 的 ko (SakiSU 式自动适配)\n- customize.sh/module.prop 同步支持范围说明\n- 本机 (vivo PD2339M, 6.1.124) 实测: 模块加载成功, 闭源 GKI 驱动加载成功\nv0.2.0 / versionCode 6",
-        "timestamp": "2026-09-29T09:06:09Z",
+        "id": "1c2fd5e29373fa746010e9b9d0d1c87e437d1662",
+        "tree_id": "0ecb0afcc3c6db503e9c9e47977522226902538a",
+        "message": "fix(ci): package-all 加诊断与容错, 不再依赖预装 zip",
+        "timestamp": "2026-09-29T09:29:59Z",
         "author": {
           "name": "ZRen277353",
           "email": "ZRen277353@users.noreply.github.com"

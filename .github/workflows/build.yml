@@ -86,16 +86,16 @@ jobs:
           mkdir -p pkg/kos
           cp module/* pkg/
           python3 - <<'EOF'
-          import glob, zipfile, io, os, sys
+          import glob, zipfile, os, sys
           found = []
           for z in sorted(glob.glob('artifacts/OpenSesame-*/*.zip')):
               base = os.path.basename(z)[:-4]
               kmi = base.replace('OpenSesame-', '')
               try:
-                  outer = zipfile.ZipFile(z)
-                  inner = zipfile.ZipFile(io.BytesIO(outer.read(base + '.zip')))
-                  open(f'pkg/kos/opensesame-{kmi}.ko', 'wb').write(inner.read('opensesame.ko'))
-                  open(f'pkg/kos/opensesame-{kmi}.offset', 'wb').write(inner.read('opensesame.offset'))
+                  # download-artifact 已解包: z 就是模块 zip 本体
+                  mod = zipfile.ZipFile(z)
+                  open(f'pkg/kos/opensesame-{kmi}.ko', 'wb').write(mod.read('opensesame.ko'))
+                  open(f'pkg/kos/opensesame-{kmi}.offset', 'wb').write(mod.read('opensesame.offset'))
                   found.append(kmi)
                   print('收录:', kmi)
               except Exception as e:
