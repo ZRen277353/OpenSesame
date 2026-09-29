@@ -1,7 +1,6 @@
 # ddk 构建入口 (ddk build 在本目录执行 make, KDIR 由 ddk 镜像环境提供)
-MODULE_NAME := opensesame
-$(MODULE_NAME)-objs := opensesame.o
-obj-m := $(MODULE_NAME).o
+# 注意: 模块名与源文件同名, 不能再写 opensesame-objs := opensesame.o (循环依赖)
+obj-m := opensesame.o
 
 KDIR := $(KDIR)
 MDIR := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))

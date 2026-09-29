@@ -1,28 +1,28 @@
 {
-  "total_count": 5,
+  "total_count": 7,
   "workflow_runs": [
     {
-      "id": 36484769299,
+      "id": 36544336254,
       "name": "Build OpenSesame",
-      "node_id": "WFR_kwLOUxLlzc8AAAAIfqlmEw",
+      "node_id": "WFR_kwLOUxLlzc8AAAAIgjZRfg",
       "head_branch": "main",
-      "head_sha": "789a45141c02a843e9ef48999e941353c6091cd1",
+      "head_sha": "d14ee352494d384338fd22a428823227a79b8798",
       "path": ".github/workflows/build.yml",
-      "display_title": "feat!: v0.1.2 弃用内核文本改写, 改用 kretprobe 覆盖 same_magic() 返回值",
-      "run_number": 5,
+      "display_title": "feat!: v0.1.4 构建环境切换为 ddk (SakiSU LKM 同款官方 GKI 环境)",
+      "run_number": 7,
       "event": "push",
       "status": "completed",
-      "conclusion": "success",
+      "conclusion": "failure",
       "workflow_id": 369506360,
-      "check_suite_id": 98795947636,
-      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXALKGdA",
-      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36484769299",
-      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36484769299",
+      "check_suite_id": 98956626492,
+      "check_suite_node_id": "CS_kwDOUxLlzc8AAAAXCkZKPA",
+      "url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254",
+      "html_url": "https://github.com/ZRen277353/OpenSesame/actions/runs/36544336254",
       "pull_requests": [
 
       ],
-      "created_at": "2026-09-28T21:14:36Z",
-      "updated_at": "2026-09-28T21:16:33Z",
+      "created_at": "2026-09-29T08:41:35Z",
+      "updated_at": "2026-09-29T08:43:09Z",
       "actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -48,7 +48,7 @@
       "referenced_workflows": [
 
       ],
-      "run_started_at": "2026-09-28T21:14:36Z",
+      "run_started_at": "2026-09-29T08:41:35Z",
       "triggering_actor": {
         "login": "ZRen277353",
         "id": 155533798,
@@ -70,19 +70,19 @@
         "user_view_type": "public",
         "site_admin": false
       },
-      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36484769299/jobs",
-      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36484769299/logs",
-      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98795947636",
-      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36484769299/artifacts",
-      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36484769299/cancel",
-      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36484769299/rerun",
+      "jobs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/jobs",
+      "logs_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/logs",
+      "check_suite_url": "https://api.github.com/repos/ZRen277353/OpenSesame/check-suites/98956626492",
+      "artifacts_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/artifacts",
+      "cancel_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/cancel",
+      "rerun_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/runs/36544336254/rerun",
       "previous_attempt_url": null,
       "workflow_url": "https://api.github.com/repos/ZRen277353/OpenSesame/actions/workflows/369506360",
       "head_commit": {
-        "id": "789a45141c02a843e9ef48999e941353c6091cd1",
-        "tree_id": "4e00cf0e272dcb319be8868902232713f3488294",
-        "message": "feat!: v0.1.2 弃用内核文本改写, 改用 kretprobe 覆盖 same_magic() 返回值\n\nv0.1 直接调用未导出的 aarch64_insn_patch_text 改写内核文本, 因原型\n(int vs unsigned int) 与调用语义和内核实际不符, 在 CFI/补丁路径上引发\n内核崩溃 (设备实测: 卡死黑屏重启)。\n\nv0.2 改为在 same_magic() 上挂 kretprobe: 函数照常执行, 返回时把 x0\n改写为 1 (__kretprobe_trampoline 从 handler 的同一份 pt_regs 恢复\nx0-x30, 调用方读到的返回值恒为 true)。只用已导出的 register_kretprobe,\n不写任何内核内存, rmmod 即还原; 注册失败即干净退出。",
-        "timestamp": "2026-09-28T21:14:21Z",
+        "id": "d14ee352494d384338fd22a428823227a79b8798",
+        "tree_id": "5ab3c9a63abbbf637cf73148bb31a5285fb1aa75",
+        "message": "feat!: v0.1.4 构建环境切换为 ddk (SakiSU LKM 同款官方 GKI 环境)\n\npstore+反汇编定位根因: ko 内嵌 struct module (this_module 段) 的\ninit/exit 指针偏移 (0x3c8) 与 vivo 内核的 target_list 偏移重合,\n即构建产物与 vivo 内核的 struct module 布局不一致, 加载必崩。\n\n改为 ddk (5ec1cff/ddk docker) 构建: 与 SakiSU 官方 LKM 完全相同的\nGKI 环境 (官方工具链/配置/Module.symvers), 其 LKM 在本机加载正常。\n- kernel/Makefile 改为 ddk 模板形态\n- CI 移除源码树 modules_prepare 流程\n- vermagic 回写支持缩短版本号前缀 (modversions 下内核忽略该段)\nv0.1.4 / versionCode 5",
+        "timestamp": "2026-09-29T08:37:16Z",
         "author": {
           "name": "ZRen277353",
           "email": "ZRen277353@users.noreply.github.com"
