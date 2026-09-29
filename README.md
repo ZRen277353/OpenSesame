@@ -2,6 +2,10 @@
 
 > 芝麻开门 —— 让内核全局放行 vermagic 校验, 所有内核驱动都能直接 insmod
 
+> 🤖 **本项目全程由 ZCode (AI 编码代理, 模型 GLM-5.3-Flash) 完成** —— 包括内核
+> 模块代码、SakiSU 模块脚本、CI 工作流、各 KMI 适配、崩溃取证分析与本 README;
+> 设备端实测与验证由项目所有者完成。
+
 <div align="center">
   <img src="https://count.getloli.com/get/@ZRen277353-OpenSesame?theme=moebooru" alt="访问计数" />
   <br/>
