@@ -67,6 +67,28 @@ adb shell "su -c 'sh /data/local/tmp/probe.sh'"
 4. `.ko` 不写任何内核内存: 唯一的内核交互是只读的 kretprobe 钩子,
    注册失败即干净退出, `rmmod` 即还原。
 
+## v0.2 路线变更: boot 内核补丁 (本机实测路线)
+
+本设备 (PD2339M / iQOO Neo9S Pro, MT6989, 6.1.124-android14-11-maybe-dirty) 实测发现:
+**任何用公共 GKI 源码 + 不同工具链构建的 .ko, 在这台 vivo 内核上加载必崩**
+(`mod_sysfs_setup` 遍历到垃圾 usage 链接, 见 pstore)。根因是 ko 内嵌的
+`struct module` (来自 `.gnu.linkonce.this_module` 段) 的布局与 vivo 内核
+实际布局存在差异, 且无法在不拿到 vivo 内核源码的前提下消除。
+
+因此本设备的最终方案改为 **boot 内核补丁**: 用 `scripts/patch_boot.py`
+解出原厂 boot 里的内核, 把 `same_magic()` 入口两条指令 (`paciasp; stp x29,x30`)
+改写为 `mov w0,#1; ret`, 重新打包。效果 = **内核全局放行 vermagic 校验**,
+原厂 driver_auto 等脚本原样可用。脚本逐字节校验、支持回读验证, 改坏可用
+原厂 boot 镜像 fastboot 刷回。
+
+```bash
+python scripts/patch_boot.py 原厂boot.img boot_patched.im
+fastboot flash boot_<当前槽位> boot_patched.im
+```
+
+注意: CRC (modversions) 校验仍保留; vivo OTA 会覆盖 boot 分区, 升级后需对新
+boot 重新打补丁。
+
 ## 目录结构
 
 ```
