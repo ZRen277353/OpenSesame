@@ -1,10 +1,12 @@
 #!/bin/sh
-# OpenSesame 公共函数: KMI 识别 / vermagic 学习回写 / 内核模块加载
-# 由 action.sh / service.sh source, 不单独执行。
+# OpenSesame 公共函数: 配置读写 / KMI 识别 / vermagic 学习回写 / 内核模块加载
+# 由 action.sh / service.sh / control.sh source, 不单独执行。
 
 MODDIR="${MODDIR:-${0%/*}}"
 MODNAME=opensesame
 KO=""; KOOFF=""; KMI=""
+CONFIG_FILE="$MODDIR/config.conf"
+LOG_FILE="$MODDIR/opensesame.log"
 
 # KSU/SukiSU/Magisk 自带的 busybox
 BB=""
@@ -25,7 +27,94 @@ acquire_lock() {
 }
 release_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
 
-log() { echo "[opensesame] $*"; }
+trim_log() {
+	[ -f "$LOG_FILE" ] || return 0
+	size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
+	[ "$size" -le 262144 ] && return 0
+	tail -c 262144 "$LOG_FILE" > "$LOG_FILE.tmp.$$" 2>/dev/null || return 0
+	mv "$LOG_FILE.tmp.$$" "$LOG_FILE" 2>/dev/null
+}
+
+log() {
+	msg="[opensesame] $*"
+	echo "$msg"
+	[ -n "$MODDIR" ] || return 0
+	ts=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown-time")
+	echo "$ts $msg" >> "$LOG_FILE" 2>/dev/null || true
+	trim_log
+}
+
+config_get() {
+	key="$1"
+	default="$2"
+	[ -n "$default" ] || default=0
+	value=$(sed -n "s/^${key}=//p" "$CONFIG_FILE" 2>/dev/null | tail -n 1)
+	case "$value" in
+		0|1) echo "$value" ;;
+		*) echo "$default" ;;
+	esac
+}
+
+config_set() {
+	key="$1"
+	value="$2"
+	case "$value" in
+		0|1) ;;
+		*) log "配置值无效: $key=$value"; return 1 ;;
+	esac
+	tmp="$CONFIG_FILE.tmp.$$"
+	{
+		for k in vermagic crc auto_start; do
+			if [ "$k" = "$key" ]; then
+				echo "$k=$value"
+			else
+				echo "$k=$(config_get "$k" 0)"
+			fi
+		done
+	} > "$tmp" || return 1
+	mv "$tmp" "$CONFIG_FILE" 2>/dev/null || return 1
+}
+
+any_feature_enabled() {
+	[ "$(config_get vermagic 0)" = "1" ] || [ "$(config_get crc 0)" = "1" ]
+}
+
+feature_args() {
+	args=""
+	[ "$(config_get vermagic 0)" = "1" ] && args="$args vermagic=1"
+	[ "$(config_get crc 0)" = "1" ] && args="$args crc=1"
+	printf '%s' "$args"
+}
+
+feature_summary() {
+	summary=""
+	[ "$(config_get vermagic 0)" = "1" ] && summary="vermagic"
+	if [ "$(config_get crc 0)" = "1" ]; then
+		[ -n "$summary" ] && summary="$summary + "
+		summary="${summary}CRC"
+	fi
+	[ -n "$summary" ] || summary="无"
+	printf '%s' "$summary"
+}
+
+active_feature() {
+	name="$1"
+	loaded || { echo 0; return 0; }
+	v=$(cat "/sys/module/$MODNAME/parameters/$name" 2>/dev/null | tr -d '\r\n')
+	case "$v" in
+		y|Y|1) echo 1 ;;
+		*) echo 0 ;;
+	esac
+}
+
+write_feature() {
+	name="$1"
+	value="$2"
+	path="/sys/module/$MODNAME/parameters/$name"
+	[ -e "$path" ] || { log "参数不存在: $name"; return 1; }
+	echo "$value" > "$path" || { log "参数写入失败: $name=$value"; return 1; }
+	return 0
+}
 
 # 按 uname -r 识别设备的 GKI KMI, 选择对应的 ko (SakiSU 式自动适配)
 select_ko() {
@@ -122,19 +211,24 @@ rewrite_ko_vermagic() {
 
 # 加载: 选 ko -> 先直接试; vermagic 失败则 学习 -> 回写 -> 重试
 load_ko() {
+	local v args
+	if ! any_feature_enabled; then
+		log "没有启用任何校验放行开关, 拒绝加载空模块"
+		return 1
+	fi
 	if ! select_ko; then
 		# ko 文件缺失时 select_ko 已给出具体原因, 这里只报 KMI 不识别的情况
 		[ -n "$KMI" ] || log "没有适配本机内核 ($(uname -r)) 的 KMI, 请到仓库用 CI 构建对应 KMI 的模块包"
 		return 1
 	fi
-	$BB insmod "$KO" 2>/dev/null && return 0
-	local v
+	args=$(feature_args)
+	$BB insmod "$KO" $args 2>/dev/null && return 0
 	v=$(device_vermagic) || {
 		log "拿不到设备 vermagic (vendor 模块和 kmsg 里都没有)"
 		return 1
 	}
 	rewrite_ko_vermagic "$v" || return 1
-	$BB insmod "$KO"
+	$BB insmod "$KO" $args
 }
 
 loaded() {

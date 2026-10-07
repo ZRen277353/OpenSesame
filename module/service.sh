@@ -1,11 +1,15 @@
 #!/bin/sh
-# 开机自动加载: 仅在 verified 标记存在时执行 (默认关闭, 由 action.sh 启用)
+# 开机自动加载: 仅在 WebUI 中开启 auto_start 且至少启用一个校验放行开关时执行
 # 防卡死设计: 连续 2 次加载后 60 秒内系统未稳定 => 熔断, 不再自动加载
 
 MODDIR="${0%/*}"
 . "$MODDIR/common.sh"
 
-[ -f "$MODDIR/verified" ] || exit 0
+[ "$(config_get auto_start 0)" = "1" ] || exit 0
+any_feature_enabled || {
+	log "开机自启已开启, 但没有启用任何校验放行开关, 本次跳过"
+	exit 0
+}
 loaded && exit 0
 
 (
@@ -25,7 +29,7 @@ loaded && exit 0
 
 	if [ "$fails" -ge 2 ]; then
 		release_lock
-		log "连续 $fails 次加载后未稳定, 本次跳过自动加载 (重装模块或点一次操作按钮可重置)"
+		log "连续 $fails 次加载后未稳定, 本次跳过自动加载 (关闭再打开开机自启可重置)"
 		exit 0
 	fi
 
@@ -33,7 +37,7 @@ loaded && exit 0
 
 	if load_ko; then
 		release_lock
-		log "自动加载成功"
+		log "自动加载成功: $(feature_summary)"
 		( sleep 60 && touch "$MODDIR/stable" ) &
 	else
 		release_lock

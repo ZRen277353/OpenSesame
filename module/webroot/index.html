@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<title>OpenSesame</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<main class="shell">
+		<header class="topbar">
+			<div>
+				<p class="eyebrow">OpenSesame</p>
+				<h1>校验放行控制</h1>
+			</div>
+			<span id="statePill" class="pill off">未加载</span>
+		</header>
+
+		<section class="panel master">
+			<div class="master-copy">
+				<h2>模块开关</h2>
+				<p id="masterHint">正在读取状态...</p>
+			</div>
+			<button id="toggleBtn" class="primary" type="button" disabled>加载模块</button>
+		</section>
+
+		<section class="panel">
+			<h2>校验开关</h2>
+			<div class="rows">
+				<label class="switch-row">
+					<span>
+						<strong>vermagic 校验放行</strong>
+						<small>same_magic()</small>
+					</span>
+					<input id="vermagicSwitch" type="checkbox">
+				</label>
+				<label class="switch-row">
+					<span>
+						<strong>符号 CRC 校验放行</strong>
+						<small>check_version()</small>
+					</span>
+					<input id="crcSwitch" type="checkbox">
+				</label>
+			</div>
+		</section>
+
+		<section class="panel">
+			<h2>开机自启</h2>
+			<div class="rows">
+				<label class="switch-row">
+					<span>
+						<strong>开机自动加载</strong>
+						<small id="autoStartHint">关闭</small>
+					</span>
+					<input id="autoStartSwitch" type="checkbox">
+				</label>
+			</div>
+		</section>
+
+		<section class="panel logs">
+			<div class="section-head">
+				<h2>运行日志</h2>
+				<button id="refreshLogsBtn" class="secondary" type="button">刷新</button>
+			</div>
+			<pre id="logBox">读取中...</pre>
+		</section>
+
+		<div id="toast" class="toast" role="status" aria-live="polite"></div>
+	</main>
+	<script src="app.js"></script>
+</body>
+</html>

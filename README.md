@@ -1,6 +1,6 @@
 # OpenSesame
 
-> 芝麻开门 —— 让内核全局放行 vermagic 校验, 所有内核驱动都能直接 insmod
+> 芝麻开门 —— 可开关放行 vermagic / 符号 CRC 校验, 让不匹配的内核驱动直接 insmod
 
 > 🤖 **本项目全程由 ZCode (AI 编码代理, 模型 GLM-5.3-Flash) 完成** —— 包括内核
 > 模块代码、SakiSU 模块脚本、CI 工作流、各 KMI 适配、崩溃取证分析与本 README;
@@ -12,12 +12,13 @@
   <sub>猫娘计数板 · 本页面被打开的次数</sub>
 </div>
 
-一个 SakiSU / KernelSU 模块: 在内核的 `same_magic()` (vermagic 比对函数) 上挂
-kretprobe, 把返回值恒改为 true —— 此后**任何 vermagic 不匹配的内核驱动都能直接
-加载**, driver_auto 等自动安装脚本原样可用。符号 CRC (CONFIG_MODVERSIONS)
-校验**有意保留**, ABI 不兼容的驱动仍会被干净地拒绝 —— 这是本项目的安全边界。
+一个 SakiSU / KernelSU 模块: 提供两个默认关闭、可独立控制的 kretprobe 开关。
+打开 `vermagic` 后, 内核 `same_magic()` 返回值恒为 true; 打开 `crc` 后,
+`check_version()` 也恒为成功。两者都关闭时模块只是空载, 不改变内核行为。
+模块内置 WebUI, 可控制两个校验开关、开机自启并查看运行日志。
 
-- **全局**: 放行的是内核的校验逻辑本身, 对之后 insmod 的一切模块生效, 无需逐个适配;
+- **可选择**: `vermagic` 与符号 CRC 两个开关独立控制, 默认全关, WebUI 手动开启;
+- **全局**: 开启后放行的是内核校验逻辑本身, 对之后 insmod 的模块生效, 无需逐个适配;
 - **热修补**: 不刷任何分区, 不改 boot 镜像, 全部效果 RAM-only, 重启即归零;
 - **可撤除**: 卸载 = `rmmod`, kprobe 注销 + 入口指令由框架自动还原, 无残留;
 - **多 KMI**: CI 矩阵预编译 android14-6.1 / android13-5.15 / android14-5.15 /
@@ -46,8 +47,8 @@ kretprobe, 把返回值恒改为 true —— 此后**任何 vermagic 不匹配�
 finit_module(2)
   └─ load_module()
        ├─ check_modinfo()        <- vermagic 比对在这里, 不过 -> -ENOEXEC
-       │    └─ same_magic()      <- 本模块的 kretprobe 目标
-       ├─ check_version()        <- 符号 CRC 比对 (本项目有意保留!)
+       │    └─ same_magic()      <- vermagic 开关的 kretprobe 目标
+       ├─ check_version()        <- 符号 CRC 比对, CRC 开关的 kretprobe 目标
        ├─ 分配/重定位/解释 .gnu.linkonce.this_module 段
        ├─ mod_sysfs_setup()      <- sysfs 节点 + 模块依赖链表
        └─ do_one_initcall()      <- 模块 init
@@ -70,7 +71,8 @@ same_magic() -> false
     -> insmod 报 "Exec format error"
 ```
 
-OpenSesame 只在这条链上动一处: **让 `same_magic()` 的返回值恒为 true**。
+OpenSesame 默认不动这些返回值。手动打开 `vermagic` 后让 `same_magic()`
+恒为 true; 手动打开 `crc` 后让 `check_version()` 恒为成功。
 
 ### kretprobe 如何全局放行 (寄存器级细节)
 
@@ -87,7 +89,7 @@ OpenSesame 只在这条链上动一处: **让 `same_magic()` 的返回值恒为 
                 调用方读到的返回值 = 1 (true)
 ```
 
-- 唯一动作是 `register_kretprobe()` 挂在 `same_magic` 符号上;
+- 开关打开时调用 `register_kretprobe()` 挂在 `same_magic` / `check_version` 上;
 - 返回 handler 只做一件事: `regs->regs[0] = 1`。arm64 的
   `__kretprobe_trampoline` 从 handler 看到的**同一份 pt_regs** 恢复
   x0-x30, 因此调用方读到的返回值恒为 true;
@@ -124,14 +126,16 @@ OpenSesame 只在这条链上动一处: **让 `same_magic()` 的返回值恒为 
    —— 同一套 GKI config + 工具链, 与 GKI/厂商内核天然对齐。v0.1.x 连续
    崩内核的根因就是这里, 见演进历程第 5 步。
 
-### 安全边界: 为什么保留符号 CRC
+### 安全边界: 两个校验开关
 
-`check_version()` 的符号 CRC 校验**有意不动**:
+两个开关都默认关闭, WebUI 中手动开启:
 
 - vermagic 只是版本字符串约定, 放行无实质风险;
-- CRC 是每个符号真实的 ABI 指纹, 布局不兼容的驱动强行加载轻则报错重则
-  崩内核。保留这层护栏: 不兼容的驱动被干净地拒绝
-  (`disagrees about version of symbol`), 而不是把手机送走。
+- CRC 是每个符号真实的 ABI 指纹, 放行后布局不兼容的驱动也能进入内核,
+  轻则报错重则崩内核。除非你明确知道驱动可与当前内核 ABI 共存, 否则保持
+  CRC 开关关闭;
+- 关闭 `crc` 时, 不兼容的驱动仍会被干净地拒绝
+  (`disagrees about version of symbol`)。
 
 ## 演进历程: 这个模块是怎么一步步做出来的
 
@@ -249,6 +253,16 @@ ddk 构建的 this_module 重定位 (init@0x170, exit@0x3d8) 与 vivo 内核
 同时印证了 GKI 的承诺: **同 KMI 小版本 OTA (6.1.124 → 6.1.145) 无需
 新 ko**, ko 通用。
 
+### 第 9 步 · WebUI 与 CRC 开关 (v0.3.0)
+
+加入 `check_version()` kretprobe 与 WebUI 控制页:
+
+- 内核模块暴露 `vermagic` / `crc` 两个 bool 参数, 默认都是 0;
+- WebUI 开关写入 `/data/adb/modules/opensesame/config.conf`, 模块已加载时
+  同步写 sysfs 参数, 立即生效;
+- 开机自启改为独立开关, 只在 `auto_start=1` 且至少一个校验开关打开时加载;
+- WebUI 下方展示脚本日志与 `dmesg` 中的 opensesame 内核日志。
+
 ## 实战状态
 
 | 设备 | 内核 | 状态 |
@@ -271,8 +285,9 @@ ddk 构建的 this_module 重定位 (init@0x170, exit@0x3d8) 与 vivo 内核
 | android15-6.6 | 预编译 |
 | android12-5.10 / android13-5.10 / android16-6.12 | ddk 支持, 未纳入矩阵, 需要时在 workflow 里追加 |
 
-前提: 内核启用 CONFIG_KPROBES, 且 kallsyms 保留了 `same_magic` 符号
-(若被编译器内联则该内核不受支持)。不确定请跑探测脚本:
+前提: 内核启用 CONFIG_KPROBES, 且 kallsyms 保留对应目标符号。
+`vermagic` 需要 `same_magic`, `crc` 需要 `check_version`; 若目标函数被
+编译器内联, 对应开关会拒绝开启。不确定请跑探测脚本:
 
 ```bash
 adb push scripts/probe.sh /data/local/tmp/
@@ -287,9 +302,12 @@ adb shell "su -c 'sh /data/local/tmp/probe.sh'"
    - `OpenSesame-<kmi>` —— 单 KMI 包, 须与设备 KMI 一致
      (两种包布局 v0.2.1 起均支持自动选择);
 2. SakiSU / KernelSU 管理器安装;
-3. **安装后默认不自动加载、不改内核**。点模块的「操作」按钮:
-   第一次点击 = 加载 + 启用开机自动加载; 再点一次 = 卸载 + 关闭;
-4. 加载成功后, 直接跑你的驱动安装脚本即可。
+3. **安装后两个校验开关和开机自启默认全关**。进入模块 WebUI:
+   - `vermagic 校验放行`: 放行 vermagic 不匹配;
+   - `符号 CRC 校验放行`: 放行 `check_version()` 的 CRC 不匹配;
+   - `开机自动加载`: 下次开机自动应用当前已打开的两个校验开关;
+4. 点 WebUI 的「加载模块」或管理器里的「操作」按钮应用当前开关;
+5. 加载成功后, 直接跑你的驱动安装脚本即可。
 
 ## 免解锁 (漏洞 root) 设备适用性
 
@@ -314,7 +332,7 @@ OpenSesame 本质是"以 root 身份执行 `insmod opensesame-<KMI>.ko`",
 内核交互全部为 RAM-only (kretprobe 钩子), 重启即归零, 最坏情况是循环
 重启而不是砖。四道保险:
 
-1. 默认不自动加载, 必须先手动验证 (action 按钮);
+1. 默认不自动加载, 验证后再打开 WebUI 的开机自启;
 2. 自动加载发生在开机末尾 (service.sh + 20s 延迟);
 3. 熔断: 连续 2 次"加载后 60 秒内系统未稳定"就拒绝自动加载;
 4. 加载流程持并发锁, 杜绝双脚本竞争 (曾实测导致 mod_sysfs_setup 崩溃)。
@@ -328,9 +346,12 @@ su -c 'cat /sys/fs/pstore/console-ramoops-0 | tail -c 6000'   # 上次崩溃现�
 
 常见失败:
 
-- `kretprobe 注册失败` = 内核把 same_magic 内联了 (不支持);
-- `disagrees about version of symbol` = 驱动 ABI 与内核不兼容 (CRC 校验
-  正确拦截, 属预期行为, 请勿绕过);
+- `same_magic 放行开关开启失败` = 内核把 same_magic 内联了 (vermagic
+  开关不可用);
+- `CRC 放行开关开启失败` = 内核没有可 hook 的 check_version 符号 (CRC
+  开关不可用);
+- `disagrees about version of symbol` = CRC 开关未打开, 驱动 ABI 与内核
+  不兼容, 被内核正确拦截;
 - `模块目录里找不到 ko 文件` = 装了 v0.2.0 及更早的**单 KMI 包**
   (旧版加载脚本只认一体包的 kos/ 布局) —— 更新模块到 v0.2.1+,
   或改装 `OpenSesame-all-kmi` 一体包;
@@ -341,10 +362,11 @@ su -c 'cat /sys/fs/pstore/console-ramoops-0 | tail -c 6000'   # 上次崩溃现�
 
 对"会不会导致游戏封号 / 动内存 / 有残留"的诚实回答:
 
-**动了什么内存**: 模块加载后只在内核的 `same_magic()` 入口挂 kretprobe,
-返回时改写寄存器 x0。不扫描、不读写任何进程的内存 (包括游戏), 不 hook
-系统调用, 不改 LSM。唯一涉及内核内存的是 kprobes 框架自己在函数入口放
-的断点指令 (标准框架行为), `rmmod` 时由框架自动还原。
+**动了什么内存**: 模块加载后只按开关在内核的 `same_magic()` /
+`check_version()` 入口挂 kretprobe, 返回时改写寄存器 x0。不扫描、不读写
+任何进程的内存 (包括游戏), 不 hook 系统调用, 不改 LSM。唯一涉及内核
+内存的是 kprobes 框架自己在函数入口放的断点指令 (标准框架行为),
+`rmmod` 时由框架自动还原。
 
 **残留**: 内核侧 rmmod 即归零 (kprobe 注销 + 指令还原), 重启更是物理
 归零 (RAM-only)。磁盘侧全部文件都在 `/data/adb/modules/opensesame/`,
@@ -357,7 +379,7 @@ su -c 'cat /sys/fs/pstore/console-ramoops-0 | tail -c 6000'   # 上次崩溃现�
    与本模块无关, 装不装 OpenSesame 这些特征都在;
 2. 你加载的闭源驱动 —— 它们是插进内核的第三方模块, 闭源且安全性无从
    审计, 风险自担;
-3. OpenSesame 本身 —— 加载期间 /proc/modules 多一个模块 + 一个
+3. OpenSesame 本身 —— 加载期间 /proc/modules 多一个模块 + 一个或两个
    kprobe, 普通应用因 SELinux 限制读不到 /proc/modules, 且卸载即消失。
 
 对封号敏感的游戏, 不放心就在进游戏前把模块开关切到卸载并 rmmod 掉
@@ -368,9 +390,9 @@ su -c 'cat /sys/fs/pstore/console-ramoops-0 | tail -c 6000'   # 上次崩溃现�
 
 - 各厂商对 GKI 的魔改程度不同, 结构体布局极端偏离 GKI 的内核上, ko 自身
   可能无法加载 (实测 case: 见演进历程第 5 步的 pstore 分析);
-- `same_magic` 被内联的内核不受支持;
-- 放行 vermagic 后, 加载来源不明的 `.ko` 风险自担 (CRC 护栏仍在, 但
-  ABI 兼容的恶意模块挡不住);
+- `same_magic` 或 `check_version` 被内联时, 对应开关不可用;
+- 放行 vermagic 后, 加载来源不明的 `.ko` 风险自担; 打开 CRC 开关后,
+  原本会被 ABI 指纹挡住的模块也可能进入内核;
 - 加载期间在 /proc/modules 可见, 不做隐藏;
 - 仅用于自有设备的实验与研究, 请遵守当地法律法规。
 
@@ -384,9 +406,11 @@ open-sesame/
 ├── module/                    # SakiSU/KernelSU 模块
 │   ├── module.prop
 │   ├── customize.sh           # 安装脚本 (arm64 检查)
-│   ├── common.sh              # KMI 识别 / vermagic 学习回写 / 加载
-│   ├── action.sh              # 「操作」按钮: 手动加载/卸载开关
+│   ├── common.sh              # 配置读写 / KMI 识别 / vermagic 学习回写 / 加载
+│   ├── control.sh             # WebUI 控制入口: 状态 / 开关 / 加载 / 日志
+│   ├── action.sh              # 「操作」按钮: 手动加载/卸载
 │   ├── service.sh             # 开机自动加载 (默认关, 带熔断)
+│   ├── webroot/               # KernelSU 模块 WebUI
 │   └── uninstall.sh
 ├── scripts/
 │   ├── probe.sh               # 设备侧支持性自测 (符号/vermagic/配置)
